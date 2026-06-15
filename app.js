@@ -5,7 +5,7 @@
    ===================================================================== */
 
 const CONFIG = {
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwxFgeWGEr-Tain5-8ZaXhQcHuvQJZC4CNmz7Z6_Aj0v6A8aEmmR772Ry5yBfggTDM/exec",      // cole a URL /exec do Web App (uma vez)
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxC-Q1sq65p5ogJtxsB1u5KEAh4s-HLye6dcD9Qm9Gl9Va9tsrtMYXYZtNwbsPGV4M/exec",      // cole a URL /exec do Web App (uma vez)
   AUTO_REFRESH_MINUTES: 5
 };
 
@@ -99,11 +99,23 @@ async function loadData() {
 
 async function fetchAppsScript(url) {
   const sep = url.includes("?") ? "&" : "?";
-  const res = await fetch(`${url}${sep}t=${Date.now()}`, { method: "GET", redirect: "follow" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  if (data && data.ok === false) throw new Error(data.error || "Erro no Web App");
-  return data;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 90000); // 90s de teto
+  try {
+    console.time("[dash] fetch Web App");
+    const res = await fetch(`${url}${sep}t=${Date.now()}`, { method: "GET", redirect: "follow", signal: ctrl.signal });
+    console.timeEnd("[dash] fetch Web App");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data && data.ok === false) throw new Error(data.error || "Erro no Web App");
+    console.log("[dash] linhas recebidas:", (data.rows || []).length);
+    return data;
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("Tempo esgotado (90s) — Web App não respondeu");
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /* Constrói registros enxutos a partir do formato compacto OU de array de objetos. */
@@ -396,12 +408,18 @@ function applyFilters() {
    ===================================================================== */
 async function refresh() {
   const btn = $("#btnRefresh"); btn.classList.add("spin");
-  await loadData();
-  buildZoneChips();
-  applyFilters();
-  $("#lastUpdate").textContent = "Atualizado " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-  setLoader(false);
-  setTimeout(() => btn.classList.remove("spin"), 600);
+  try {
+    await loadData();
+    buildZoneChips();
+    applyFilters();
+  } catch (e) {
+    console.error("[dash] erro no refresh:", e);
+    $("#footStatus").textContent = "Erro: " + e.message;
+  } finally {
+    $("#lastUpdate").textContent = "Atualizado " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    setLoader(false);                       // garante que o loader sempre some
+    setTimeout(() => btn.classList.remove("spin"), 600);
+  }
 }
 function startAutoRefresh() {
   if (STATE.refreshTimer) clearInterval(STATE.refreshTimer);
