@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CAD PE · Ocupação de Armazenagem — Shopee Fulfillment</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- Bootstrap Icons (Warehouse, boxes, inventory) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ============ TOP BAR ============ -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="btn-icon d-lg-none" id="btnOpenFilters" aria-label="Abrir filtros">
+        <i class="bi bi-sliders"></i>
+      </button>
+      <div class="brand">
+        <span class="brand-mark"><i class="bi bi-buildings-fill"></i></span>
+        <div class="brand-text">
+          <strong>CAD PE · Torre de Controle</strong>
+          <span>Ocupação de Armazenagem — Shopee Fulfillment (BRFPE1)</span>
+        </div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="saturation-pill" id="saturationPill" title="Saturação geral do Picking">
+        <span class="dot"></span><span class="label">—</span>
+      </div>
+      <div class="refresh-box">
+        <span id="lastUpdate" class="muted">Carregando…</span>
+        <button class="btn-icon" id="btnRefresh" title="Atualizar agora" aria-label="Atualizar agora">
+          <i class="bi bi-arrow-repeat"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ ALERTS ============ -->
+  <div id="alertsBar" class="alerts-bar" hidden></div>
+
+  <div class="app-shell">
+
+    <!-- ============ FILTER SIDEBAR ============ -->
+    <aside class="filters" id="filtersPanel">
+      <div class="filters-head">
+        <h2><i class="bi bi-funnel-fill"></i> Filtros</h2>
+        <button class="btn-icon d-lg-none" id="btnCloseFilters" aria-label="Fechar filtros"><i class="bi bi-x-lg"></i></button>
+      </div>
+
+      <div class="filter-group">
+        <label for="fSearch">Pesquisa livre</label>
+        <div class="search-wrap">
+          <i class="bi bi-search"></i>
+          <input type="search" id="fSearch" placeholder="SKU, nome, rua, lote…" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label for="fZone">Zona</label>
+        <select id="fZone" class="form-select form-select-sm" multiple size="6"></select>
+      </div>
+
+      <div class="filter-group">
+        <label for="fStreet">Rua</label>
+        <select id="fStreet" class="form-select form-select-sm" multiple size="6"></select>
+      </div>
+
+      <div class="filter-group">
+        <label for="fStockType">Stock Type</label>
+        <select id="fStockType" class="form-select form-select-sm"></select>
+      </div>
+
+      <div class="filter-group">
+        <label for="fBulky">Bulky</label>
+        <select id="fBulky" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <option value="1">Somente Bulky</option>
+          <option value="0">Sem Bulky</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Período (Date)</label>
+        <input type="date" id="fDateFrom" class="form-control form-control-sm mb-1" />
+        <input type="date" id="fDateTo" class="form-control form-control-sm" />
+      </div>
+
+      <div class="filter-group">
+        <label>Inbound Date</label>
+        <input type="date" id="fInboundFrom" class="form-control form-control-sm mb-1" />
+        <input type="date" id="fInboundTo" class="form-control form-control-sm" />
+      </div>
+
+      <div class="filter-actions">
+        <button class="btn btn-sh w-100" id="btnApply"><i class="bi bi-check2"></i> Aplicar</button>
+        <button class="btn btn-ghost w-100 mt-2" id="btnClear"><i class="bi bi-eraser"></i> Limpar</button>
+      </div>
+      <p class="rows-info" id="rowsInfo"></p>
+    </aside>
+    <div class="filters-overlay" id="filtersOverlay"></div>
+
+    <!-- ============ MAIN ============ -->
+    <main class="content">
+
+      <!-- KPIs -->
+      <section class="kpi-grid" id="kpiGrid">
+        <!-- KPI cards injected -->
+      </section>
+
+      <!-- CONTROL TOWER + GAUGE -->
+      <section class="grid-2 mb-section">
+        <div class="card tower-card">
+          <div class="card-head">
+            <h3><i class="bi bi-broadcast-pin"></i> Torre de Controle — Resumo Executivo</h3>
+          </div>
+          <div class="tower-grid" id="towerGrid"></div>
+        </div>
+        <div class="card gauge-card">
+          <div class="card-head"><h3><i class="bi bi-speedometer2"></i> Health Score · Picking</h3></div>
+          <div id="healthGauge" class="gauge-wrap"></div>
+          <div class="gauge-legend" id="healthLegend"></div>
+        </div>
+      </section>
+
+      <!-- HEATMAP -->
+      <section class="card mb-section">
+        <div class="card-head">
+          <h3><i class="bi bi-grid-3x3-gap-fill"></i> Heat Map de Ocupação por Rua</h3>
+          <div class="heat-scale" id="heatScale"></div>
+        </div>
+        <div class="heatmap-scroll">
+          <div id="heatmap" class="heatmap"></div>
+        </div>
+      </section>
+
+      <!-- ZONE CARDS -->
+      <section class="mb-section">
+        <div class="section-title"><i class="bi bi-boxes"></i> Cards de Zona</div>
+        <div class="zone-grid" id="zoneCards"></div>
+      </section>
+
+      <!-- CAPACITY + DONUT -->
+      <section class="grid-2 mb-section">
+        <div class="card">
+          <div class="card-head"><h3><i class="bi bi-battery-half"></i> Capacidade Disponível — Picking</h3></div>
+          <div id="capacityPanel" class="capacity-panel"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3><i class="bi bi-pie-chart-fill"></i> Distribuição do Estoque por Zona</h3></div>
+          <div id="distroDonut"></div>
+        </div>
+      </section>
+
+      <!-- TOP TABLES -->
+      <section class="grid-2 mb-section">
+        <div class="card">
+          <div class="card-head"><h3><i class="bi bi-exclamation-triangle-fill"></i> Top 10 Ruas Críticas</h3></div>
+          <div class="table-wrap"><table class="data-table" id="topStreets"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3><i class="bi bi-box-seam-fill"></i> Top 10 SKU — Maior Estoque</h3></div>
+          <div class="table-wrap"><table class="data-table" id="topSkuQty"></table></div>
+        </div>
+      </section>
+
+      <section class="grid-2 mb-section">
+        <div class="card">
+          <div class="card-head"><h3><i class="bi bi-aspect-ratio-fill"></i> Top 10 SKU — Maior Cubagem</h3></div>
+          <div class="table-wrap"><table class="data-table" id="topSkuCub"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3><i class="bi bi-diagram-3-fill"></i> Densidade de SKU por Rua</h3></div>
+          <div class="heatmap-scroll"><div id="densityMap" class="density-map"></div></div>
+          <p class="hint">SKU distintos ÷ Endereços — identifica ruas com excesso de mistura.</p>
+        </div>
+      </section>
+
+      <!-- BULKY -->
+      <section class="card mb-section">
+        <div class="card-head"><h3><i class="bi bi-truck-flatbed"></i> Análise de Bulky</h3></div>
+        <div class="bulky-grid" id="bulkyPanel"></div>
+      </section>
+
+      <!-- AGE + DAILY -->
+      <section class="grid-2 mb-section">
+        <div class="card">
+          <div class="card-head"><h3><i class="bi bi-hourglass-split"></i> Idade de Estoque</h3></div>
+          <canvas id="ageChart" height="150"></canvas>
+          <div class="table-wrap mt-2"><table class="data-table compact" id="ageTable"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3><i class="bi bi-graph-up"></i> Evolução Diária</h3></div>
+          <canvas id="dailyChart" height="150"></canvas>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <span>Dashboard de Ocupação · CAD PE (BRFPE1)</span>
+        <span id="footStatus"></span>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Loading overlay -->
+  <div id="loader" class="loader">
+    <div class="loader-box">
+      <span class="loader-mark"><i class="bi bi-buildings-fill"></i></span>
+      <div class="spinner-border text-sh" role="status"></div>
+      <p id="loaderMsg">Conectando ao Google Sheets…</p>
+    </div>
+  </div>
+
+  <!-- Tooltip element for heatmap -->
+  <div id="heatTooltip" class="heat-tooltip" hidden></div>
+
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.1/dist/apexcharts.min.js"></script>
+
+  <script src="app.js"></script>
+</body>
+</html>
