@@ -5,7 +5,7 @@
    ===================================================================== */
 
 const CONFIG = {
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxC-Q1sq65p5ogJtxsB1u5KEAh4s-HLye6dcD9Qm9Gl9Va9tsrtMYXYZtNwbsPGV4M/exec",      // cole a URL /exec do Web App (uma vez)
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzrWzhMFTBJ6pGiZCh85gwozW2Tfy3kRdxeYabMYSliKv9B-VtOEp70wQvySh_YjuQ/exec",      // cole a URL /exec do Web App (uma vez)
   AUTO_REFRESH_MINUTES: 5
 };
 
@@ -35,7 +35,6 @@ const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const fmtInt = n => Math.round(n || 0).toLocaleString("pt-BR");
 const fmtNum = (n, d = 1) => (n || 0).toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
-const fmtMoney = n => (n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const pctTxt = n => `${fmtNum(n, 1)}%`;
 const num = v => { if (typeof v === "number") return v; const n = parseFloat(String(v ?? "").replace(/\./g, "").replace(",", ".")); return isFinite(n) ? n : 0; };
 const numDot = v => { if (typeof v === "number") return v; const n = parseFloat(String(v ?? "").replace(",", ".")); return isFinite(n) ? n : 0; };
@@ -130,26 +129,21 @@ function buildRecords(data) {
       zone: find(["Zone"]),
       qty: find(["Qty", "Quantidade"]),
       skuId: find(["SKU ID", "SKUID", "SKU"]),
-      skuName: find(["SKU Name", "SKUName", "Nome"]),
-      cogs: find(["Unit COGS", "UnitCOGS"]),
-      val: find(["SKU Value", "SKUValue"]),
-      price: find(["Listing Price", "ListingPrice"])
+      skuName: find(["SKU Name", "SKUName", "Nome"])
     };
     const at = (row, i) => i >= 0 ? row[i] : "";
     return data.rows.map(row => makeRecord({
       loc: at(row, c.loc), zone: at(row, c.zone), qty: at(row, c.qty),
-      skuId: at(row, c.skuId), skuName: at(row, c.skuName),
-      cogs: at(row, c.cogs), val: at(row, c.val), price: at(row, c.price)
+      skuId: at(row, c.skuId), skuName: at(row, c.skuName)
     }));
   }
-  // fallback: array de objetos (rows:[{...}]) — usado por compat antiga
+  // fallback: array de objetos (rows:[{...}])
   const arr = Array.isArray(data) ? data : (data.rows || []);
   return arr.map(o => {
     const g = (...keys) => { for (const k of keys) { const f = Object.keys(o).find(x => x.toLowerCase().trim() === k.toLowerCase()); if (f != null && o[f] !== "") return o[f]; } return ""; };
     return makeRecord({
       loc: g("Location ID", "LocationID"), zone: g("Zone"), qty: g("Qty"),
-      skuId: g("SKU ID", "SKU"), skuName: g("SKU Name"),
-      cogs: g("Unit COGS"), val: g("SKU Value"), price: g("Listing Price")
+      skuId: g("SKU ID", "SKU"), skuName: g("SKU Name")
     });
   });
 }
@@ -157,13 +151,10 @@ function buildRecords(data) {
 function makeRecord(f) {
   const locId = String(f.loc || "");
   const family = familyOf(f.zone, locId);
-  const qty = numDot(f.qty);
-  const skuVal = numDot(f.val), cogs = numDot(f.cogs);
   return {
     family, locId, street: streetOf(family, f.zone, locId),
     skuId: String(f.skuId || ""), skuName: String(f.skuName || ""),
-    qty,
-    value: skuVal > 0 ? skuVal : qty * cogs   // valor do estoque (linha)
+    qty: numDot(f.qty)
   };
 }
 
@@ -171,14 +162,14 @@ function makeRecord(f) {
    2) AGREGAÇÃO
    ===================================================================== */
 function aggregate(rows) {
-  const A = { totalQty: 0, totalValue: 0, skuSet: new Set(), locSet: new Set(), families: {}, streets: {}, skuQty: {} };
+  const A = { totalQty: 0, skuSet: new Set(), locSet: new Set(), families: {}, streets: {}, skuQty: {} };
   for (const r of rows) {
-    A.totalQty += r.qty; A.totalValue += r.value;
+    A.totalQty += r.qty;
     if (r.skuId) A.skuSet.add(r.skuId);
     if (r.locId) A.locSet.add(r.locId);
 
-    const f = A.families[r.family] || (A.families[r.family] = { qty: 0, value: 0, skuSet: new Set(), locSet: new Set() });
-    f.qty += r.qty; f.value += r.value;
+    const f = A.families[r.family] || (A.families[r.family] = { qty: 0, skuSet: new Set(), locSet: new Set() });
+    f.qty += r.qty;
     if (r.skuId) f.skuSet.add(r.skuId);
     if (r.locId) f.locSet.add(r.locId);
 
@@ -233,8 +224,8 @@ function renderKPIs(A) {
   const cards = [
     { lbl: "Total de Peças", val: fmtInt(A.totalQty), sub: "estoque total · Σ Qty", ico: "bi-boxes" },
     { lbl: "SKUs Ativos", val: fmtInt(A.skuSet.size), sub: "SKU ID distintos", ico: "bi-upc-scan" },
-    { lbl: "Valor do Estoque", val: fmtMoney(A.totalValue), sub: "Σ SKU Value", ico: "bi-cash-stack" },
-    { lbl: "Endereços", val: fmtInt(A.locSet.size), sub: "Location ID distintos", ico: "bi-geo-alt-fill" }
+    { lbl: "Endereços", val: fmtInt(A.locSet.size), sub: "Location ID distintos", ico: "bi-geo-alt-fill" },
+    { lbl: "Ocupação Picking", val: pctTxt(pickingOcc(A)), sub: "peças ÷ capacidade", ico: "bi-bezier2" }
   ];
   $("#kpiGrid").innerHTML = cards.map(c => `
     <div class="kpi"><i class="bi ${c.ico} kpi-ico"></i>
@@ -321,10 +312,9 @@ function renderZoneCards(A) {
       <div class="zc-stats">
         <span>Peças<b>${fmtInt(f.qty)}</b></span><span>SKU<b>${fmtInt(f.skuSet.size)}</b></span>
         <span>Endereços<b>${fmtInt(c.addresses)}</b></span><span>Capac.<b>${fmtInt(c.cap)}</b></span>
-        <span>Livre<b>${fmtInt(c.free)}</b></span><span>Valor<b>${fmtMoney(f.value)}</b></span>
       </div>
       <div class="zc-bar"><i style="width:${Math.min(100, c.occ)}%;background:${col}"></i></div>
-      <div class="zc-occ"><span>Ocupação</span><span>${pctTxt(c.occ)}</span></div>
+      <div class="zc-occ"><span>Livre: ${fmtInt(c.free)}</span><span>${pctTxt(c.occ)}</span></div>
     </div>`;
   }).join("");
 }
@@ -447,8 +437,8 @@ function buildDemoData() {
   const emit = (family, zoneRaw, locId, intensity) => {
     const cap = CAPACITY[family] ?? 15, n = 1 + Math.floor(Math.random() * 3);
     for (let k = 0; k < n; k++) {
-      const cogs = +rnd(5, 200).toFixed(2), qty = Math.max(1, Math.round(cap * intensity / n * rnd(.7, 1.3)));
-      rows.push(makeRecord({ loc: locId, zone: zoneRaw, qty, skuId: "SKU" + (sku++), skuName: pick(names), cogs, val: +(qty * cogs * rnd(1.4, 2.2)).toFixed(2), price: 0 }));
+      const qty = Math.max(1, Math.round(cap * intensity / n * rnd(.7, 1.3)));
+      rows.push(makeRecord({ loc: locId, zone: zoneRaw, qty, skuId: "SKU" + (sku++), skuName: pick(names) }));
     }
   };
   for (const [fam, c] of Object.entries(numFam))
